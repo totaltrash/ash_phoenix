@@ -32,7 +32,7 @@ defmodule AshPhoenix.Form do
   form =
     user
     |> AshPhoenix.Form.for_update(:update,
-      api: MyApi,
+      domain: MyDomain,
       forms: [auto?: true]
       )
     |> to_form()
@@ -46,7 +46,7 @@ defmodule AshPhoenix.Form do
   form =
     user
     |> AshPhoenix.Form.for_update(:update,
-      api: MyApi,
+      domain: MyDomain,
       forms: [
         profile: [
           resource: MyApp.Profile,
@@ -99,7 +99,7 @@ defmodule AshPhoenix.Form do
     form =
       MyApp.Grocery.Order
       |> AshPhoenix.Form.for_create(:create,
-        api: MyApp.Grocery,
+        domain: MyApp.Grocery,
         forms: [
           items: [
             type: :list,
@@ -157,7 +157,7 @@ defmodule AshPhoenix.Form do
     :data,
     :form_keys,
     :forms,
-    :api,
+    :domain,
     :method,
     :submit_errors,
     :opts,
@@ -217,10 +217,10 @@ defmodule AshPhoenix.Form do
       Warns on any errors that don't match the form pattern of `{:field, "message", [replacement: :vars]}` or implement the `AshPhoenix.FormData.Error` protocol.
       """
     ],
-    api: [
+    domain: [
       type: :atom,
       doc:
-        "The api module to use for form submission. If not set, calls to `Form.submit/2` will fail"
+        "The domain module to use for form submission. If not set, calls to `Form.submit/2` will fail"
     ],
     as: [
       type: :string,
@@ -366,7 +366,7 @@ defmodule AshPhoenix.Form do
 
     {opts, extra} = Keyword.split(opts, keys)
 
-    opts = Spark.OptionsHelpers.validate!(opts, schema)
+    opts = Spark.Options.validate!(opts, schema)
 
     Keyword.merge(opts, extra)
   end
@@ -417,7 +417,7 @@ defmodule AshPhoenix.Form do
   Creates a form corresponding to a create action on a resource.
 
   Options:
-  #{Spark.OptionsHelpers.docs(@for_opts)}
+  #{Spark.Options.docs(@for_opts)}
 
   Any *additional* options will be passed to the underlying call to `Ash.Changeset.for_create/4`. This means
   you can set things like the tenant/actor. These will be retained, and provided again when `Form.submit/3` is called.
@@ -431,7 +431,7 @@ defmodule AshPhoenix.Form do
   result and pass it to the `forms` option. To pass options, use `auto?: [option1: :value]`. See the
   documentation of `AshPhoenix.Form.Auto` for more.
 
-  #{Spark.OptionsHelpers.docs(@nested_form_opts)}
+  #{Spark.Options.docs(@nested_form_opts)}
   """
   @spec for_create(Ash.Resource.t(), action :: atom, opts :: Keyword.t()) :: t()
   def for_create(resource, action, opts \\ []) when is_atom(resource) do
@@ -460,7 +460,7 @@ defmodule AshPhoenix.Form do
 
     name = opts[:as] || "form"
     id = opts[:id] || opts[:as] || "form"
-    api = opts[:api] || Ash.Resource.Info.api(resource)
+    domain = opts[:domain] || Ash.Resource.Info.domain(resource)
 
     {forms, params} =
       handle_forms(
@@ -485,8 +485,10 @@ defmodule AshPhoenix.Form do
       |> set_accessing_from(opts)
 
     {source, opts} =
-      if api || source.api do
-        Ash.Actions.Helpers.add_process_context(api || source.api, source, opts)
+      if domain || source.domain do
+        {source, opts}
+        # @TODO
+        # Ash.Actions.Helpers.add_process_context(domain || source.domain, source, opts)
       else
         {source, opts}
       end
@@ -503,7 +505,7 @@ defmodule AshPhoenix.Form do
       resource: resource,
       action: action,
       type: :create,
-      api: api,
+      domain: domain,
       params: params,
       errors: opts[:errors],
       transform_errors: opts[:transform_errors],
@@ -529,7 +531,7 @@ defmodule AshPhoenix.Form do
   Creates a form corresponding to an update action on a record.
 
   Options:
-  #{Spark.OptionsHelpers.docs(@for_opts)}
+  #{Spark.Options.docs(@for_opts)}
 
   Any *additional* options will be passed to the underlying call to `Ash.Changeset.for_update/4`. This means
   you can set things like the tenant/actor. These will be retained, and provided again when `Form.submit/3` is called.
@@ -561,7 +563,7 @@ defmodule AshPhoenix.Form do
 
     name = opts[:as] || "form"
     id = opts[:id] || opts[:as] || "form"
-    api = opts[:api] || Ash.Resource.Info.api(resource)
+    domain = opts[:domain] || Ash.Resource.Info.domain(resource)
 
     prepare_source = opts[:prepare_source] || (& &1)
 
@@ -589,8 +591,10 @@ defmodule AshPhoenix.Form do
       |> set_accessing_from(opts)
 
     {source, opts} =
-      if api || source.api do
-        Ash.Actions.Helpers.add_process_context(api || source.api, source, opts)
+      if domain || source.domain do
+        {source, opts}
+        # @TODO
+        # Ash.Actions.Helpers.add_process_context(domain || source.domain, source, opts)
       else
         {source, opts}
       end
@@ -608,7 +612,7 @@ defmodule AshPhoenix.Form do
       data: data,
       action: action,
       type: :update,
-      api: api,
+      domain: domain,
       params: params,
       errors: opts[:errors],
       transform_errors: opts[:transform_errors],
@@ -639,17 +643,17 @@ defmodule AshPhoenix.Form do
   end
 
   def can_submit?(form) do
-    unless form.api do
+    unless form.domain do
       raise """
-      No Api configured, but one is required to check authorization to submit a form.
+      No Domain configured, but one is required to check authorization to submit a form.
 
       For example:
 
-          Form.for_create(Resource, :action, api: MyApp.MyApi)
+          Form.for_create(Resource, :action, domain: MyApp.MyDomain)
       """
     end
 
-    form.api.can?(form.source, form.source.context[:private][:actor])
+    form.domain.can?(form.source, form.source.context[:private][:actor])
   end
 
   @spec ensure_can_submit!(t()) :: t()
@@ -659,17 +663,17 @@ defmodule AshPhoenix.Form do
   end
 
   def ensure_can_submit!(form) do
-    unless form.api do
+    unless form.domain do
       raise """
-      No Api configured, but one is required to check authorization to submit a form.
+      No Domain configured, but one is required to check authorization to submit a form.
 
       For example:
 
-          Form.for_create(Resource, :action, api: MyApp.MyApi)
+          Form.for_create(Resource, :action, domain: MyApp.MyDomain)
       """
     end
 
-    case form.api.can(form.source, form.source.context[:private][:actor],
+    case form.domain.can(form.source, form.source.context[:private][:actor],
            return_forbidden_error?: true
          ) do
       {:ok, false, %{stacktrace: %{stacktrace: stacktrace}} = exception} ->
@@ -693,7 +697,7 @@ defmodule AshPhoenix.Form do
   Creates a form corresponding to a destroy action on a record.
 
   Options:
-  #{Spark.OptionsHelpers.docs(@for_opts)}
+  #{Spark.Options.docs(@for_opts)}
 
   Any *additional* options will be passed to the underlying call to `Ash.Changeset.for_destroy/4`. This means
   you can set things like the tenant/actor. These will be retained, and provided again when `Form.submit/3` is called.
@@ -725,7 +729,7 @@ defmodule AshPhoenix.Form do
 
     name = opts[:as] || "form"
     id = opts[:id] || opts[:as] || "form"
-    api = opts[:api] || Ash.Resource.Info.api(resource)
+    domain = opts[:domain] || Ash.Resource.Info.domain(resource)
     prepare_source = opts[:prepare_source] || (& &1)
 
     {forms, params} =
@@ -752,8 +756,10 @@ defmodule AshPhoenix.Form do
       |> set_accessing_from(opts)
 
     {source, opts} =
-      if api || source.api do
-        Ash.Actions.Helpers.add_process_context(api || source.api, source, opts)
+      if domain || source.domain do
+        {source, opts}
+        # @TODO
+        # Ash.Actions.Helpers.add_process_context(domain || source.domain, source, opts)
       else
         {source, opts}
       end
@@ -782,7 +788,7 @@ defmodule AshPhoenix.Form do
       transform_params: opts[:transform_params],
       prepare_params: opts[:prepare_params],
       prepare_source: opts[:prepare_source],
-      api: api,
+      domain: domain,
       method: opts[:method] || form_for_method(:destroy),
       touched_forms: touched_forms(forms, params, opts),
       form_keys: Keyword.new(List.wrap(opts[:forms])),
@@ -798,7 +804,7 @@ defmodule AshPhoenix.Form do
   Creates a form corresponding to a read action on a resource.
 
   Options:
-  #{Spark.OptionsHelpers.docs(@for_opts)}
+  #{Spark.Options.docs(@for_opts)}
 
   Any *additional* options will be passed to the underlying call to `Ash.Query.for_read/4`. This means
   you can set things like the tenant/actor. These will be retained, and provided again when `Form.submit/3` is called.
@@ -809,7 +815,7 @@ defmodule AshPhoenix.Form do
 
   ## Nested Form Options
 
-  #{Spark.OptionsHelpers.docs(@nested_form_opts)}
+  #{Spark.Options.docs(@nested_form_opts)}
   """
   @spec for_read(Ash.Resource.t(), action :: atom, opts :: Keyword.t()) :: t()
   def for_read(resource, action, opts \\ []) when is_atom(resource) do
@@ -824,7 +830,7 @@ defmodule AshPhoenix.Form do
 
     name = opts[:as] || "form"
     id = opts[:id] || opts[:as] || "form"
-    api = opts[:api] || Ash.Resource.Info.api(resource)
+    domain = opts[:domain] || Ash.Resource.Info.domain(resource)
 
     {forms, params} =
       handle_forms(
@@ -863,8 +869,10 @@ defmodule AshPhoenix.Form do
       |> set_accessing_from(opts)
 
     {source, opts} =
-      if api || source.api do
-        Ash.Actions.Helpers.add_process_context(api || source.api, source, opts)
+      if domain || source.domain do
+        {source, opts}
+        # @TODO
+        # Ash.Actions.Helpers.add_process_context(domain || source.domain, source, opts)
       else
         {source, opts}
       end
@@ -891,7 +899,7 @@ defmodule AshPhoenix.Form do
       forms: forms,
       form_keys: Keyword.new(List.wrap(opts[:forms])),
       id: id,
-      api: api,
+      domain: domain,
       method: opts[:method] || form_for_method(:create),
       opts: opts,
       touched_forms: touched_forms(forms, params, opts),
@@ -996,7 +1004,7 @@ defmodule AshPhoenix.Form do
           action
       end
 
-    Enum.reject(action.arguments, & &1.private?)
+    Enum.reject(action.arguments, &(!&1.public?))
   end
 
   @validate_opts [
@@ -1025,7 +1033,7 @@ defmodule AshPhoenix.Form do
 
   Options:
 
-  #{Spark.OptionsHelpers.docs(@validate_opts)}
+  #{Spark.Options.docs(@validate_opts)}
   """
   @spec validate(t(), map, Keyword.t()) :: t()
   @spec validate(Phoenix.HTML.Form.t(), map, Keyword.t()) :: Phoenix.HTML.Form.t()
@@ -1144,7 +1152,7 @@ defmodule AshPhoenix.Form do
             )
             |> Ash.Changeset.for_create(
               form.action,
-              changeset_params,
+              Map.drop(changeset_params, ["_form_type", "_touched"]),
               source_opts
             )
 
@@ -1157,7 +1165,7 @@ defmodule AshPhoenix.Form do
             )
             |> Ash.Changeset.for_update(
               form.action,
-              changeset_params,
+              Map.drop(changeset_params, ["_form_type", "_touched"]),
               source_opts
             )
 
@@ -1170,7 +1178,7 @@ defmodule AshPhoenix.Form do
             )
             |> Ash.Changeset.for_destroy(
               form.action,
-              changeset_params,
+              Map.drop(changeset_params, ["_form_type", "_touched"]),
               source_opts
             )
 
@@ -1183,7 +1191,7 @@ defmodule AshPhoenix.Form do
             )
             |> Ash.Query.for_read(
               form.action,
-              changeset_params,
+              Map.drop(changeset_params, ["_form_type", "_touched"]),
               source_opts
             )
             |> add_errors_for_unhandled_params(changeset_params)
@@ -1601,10 +1609,10 @@ defmodule AshPhoenix.Form do
       default: false,
       doc: "Submit the form even if it is invalid in its current state."
     ],
-    api_opts: [
+    domain_opts: [
       type: :keyword_list,
       default: [],
-      doc: "Opts to pass to the call to the api when submitting"
+      doc: "Opts to pass to the call to the domain when submitting"
     ],
     errors: [
       type: :boolean,
@@ -1661,9 +1669,9 @@ defmodule AshPhoenix.Form do
   ]
 
   @doc """
-  Submits the form by calling the appropriate function on the configured api.
+  Submits the form by calling the appropriate function on the configured domain.
 
-  For example, a form created with `for_update/3` will call `api.update(changeset)`, where
+  For example, a form created with `for_update/3` will call `domain.update(changeset)`, where
   changeset is the result of passing the `Form.params/3` into `Ash.Changeset.for_update/4`.
 
   If the submission returns an error, the resulting form can simply be rerendered. Any nested
@@ -1671,7 +1679,7 @@ defmodule AshPhoenix.Form do
 
   Options:
 
-  #{Spark.OptionsHelpers.docs(@submit_opts)}
+  #{Spark.Options.docs(@submit_opts)}
   """
   @spec submit(t(), Keyword.t()) ::
           {:ok, Ash.Resource.record() | nil | list(Ash.Notifier.Notification.t())}
@@ -1699,7 +1707,8 @@ defmodule AshPhoenix.Form do
   end
 
   def submit(form, opts) do
-    changeset_opts = Keyword.drop(form.opts, [:forms, :errors, :id, :method, :for, :as])
+    changeset_opts =
+      Keyword.drop(form.opts, [:forms, :errors, :id, :method, :for, :as])
 
     form =
       if opts[:params] do
@@ -1723,21 +1732,21 @@ defmodule AshPhoenix.Form do
     before_submit = opts[:before_submit] || (& &1)
 
     if form.valid? || opts[:force?] do
-      unless form.api do
+      unless form.domain do
         raise """
-        No Api configured, but one is required to submit the form.
+        No Domain configured, but one is required to submit the form.
 
         At form building:
 
-            Form.for_create(Resource, :action, api: MyApp.MyApi)
+            Form.for_create(Resource, :action, domain: MyApp.MyDomain)
 
         Or set up in the resource definition directly:
 
-            use Ash.Resource, api: MyApp.MyApi
+            use Ash.Resource, domain: MyApp.MyDomain
         """
       end
 
-      case Ash.Api.Info.resource(form.api, form.resource) do
+      case Ash.Domain.Info.resource(form.domain, form.resource) do
         {:ok, _} ->
           :ok
 
@@ -1747,6 +1756,8 @@ defmodule AshPhoenix.Form do
 
       changeset_params =
         opts[:override_params] || params(form)
+
+      changeset_params = Map.drop(changeset_params, ["_form_type", "_touched"])
 
       prepare_source = form.prepare_source || (& &1)
 
@@ -1762,7 +1773,7 @@ defmodule AshPhoenix.Form do
               changeset_opts
             )
             |> before_submit.()
-            |> with_changeset(&form.api.create(&1, opts[:api_opts] || []))
+            |> with_changeset(&form.domain.create(&1, opts[:domain_opts] || []))
 
           :update ->
             form.original_data
@@ -1774,7 +1785,7 @@ defmodule AshPhoenix.Form do
               changeset_opts
             )
             |> before_submit.()
-            |> with_changeset(&form.api.update(&1, opts[:api_opts] || []))
+            |> with_changeset(&form.domain.update(&1, opts[:domain_opts] || []))
 
           :destroy ->
             form.original_data
@@ -1786,7 +1797,7 @@ defmodule AshPhoenix.Form do
               changeset_opts
             )
             |> before_submit.()
-            |> with_changeset(&form.api.destroy(&1, opts[:api_opts] || []))
+            |> with_changeset(&form.domain.destroy(&1, opts[:domain_opts] || []))
 
           :read ->
             if opts[:read_one?] do
@@ -1799,23 +1810,23 @@ defmodule AshPhoenix.Form do
                 changeset_opts
               )
               |> before_submit.()
-              |> with_changeset(&form.api.read_one(&1, opts[:api_opts] || []))
+              |> with_changeset(&form.domain.read_one(&1, opts[:domain_opts] || []))
             else
               form.resource
               |> Ash.Query.for_read(
                 form.source.action.name,
-                opts[:override_params] || params(form),
+                changeset_params,
                 changeset_opts
               )
               |> before_submit.()
-              |> with_changeset(&form.api.read(&1, opts[:api_opts] || []))
+              |> with_changeset(&form.domain.read(&1, opts[:domain_opts] || []))
             end
         end
 
       case result do
         {:error, %Ash.Error.Invalid.NoSuchResource{resource: resource}} ->
           raise """
-          Resource #{inspect(resource)} not found in api #{inspect(form.api)}
+          Resource #{inspect(resource)} not found in domain #{inspect(form.domain)}
           """
 
         {:error, %{query: query} = error} when form.type == :read ->
@@ -2002,7 +2013,7 @@ defmodule AshPhoenix.Form do
   end
 
   def update_forms_at_path(form, path, func, opts) do
-    opts = Spark.OptionsHelpers.validate!(opts, @update_form_opts)
+    opts = Spark.Options.validate!(opts, @update_form_opts)
 
     path =
       case path do
@@ -2067,7 +2078,7 @@ defmodule AshPhoenix.Form do
   end
 
   def update_form(form, path, func, opts) do
-    opts = Spark.OptionsHelpers.validate!(opts, @update_form_opts)
+    opts = Spark.Options.validate!(opts, @update_form_opts)
 
     path =
       case path do
@@ -2253,7 +2264,7 @@ defmodule AshPhoenix.Form do
   By default, only errors on the form being passed in (not nested forms) are provided.
   Use `for_path` to get errors for nested forms.
 
-  #{Spark.OptionsHelpers.docs(@errors_opts)}
+  #{Spark.Options.docs(@errors_opts)}
   """
   @spec errors(t() | Phoenix.HTML.Form.t(), Keyword.t()) ::
           ([{atom, {String.t(), Keyword.t()}}]
@@ -2935,7 +2946,7 @@ defmodule AshPhoenix.Form do
   `add_form` with not string keys/values you may not be able to depend on the shape of the `params` map (which you should ideally
   not depend on anyway).
 
-  #{Spark.OptionsHelpers.docs(@add_form_opts)}
+  #{Spark.Options.docs(@add_form_opts)}
   """
   @spec add_form(t(), String.t() | atom | list(atom | integer), Keyword.t()) :: t()
   @spec add_form(Phoenix.HTML.Form.t(), String.t() | atom | list(atom | integer), Keyword.t()) ::
@@ -2949,7 +2960,7 @@ defmodule AshPhoenix.Form do
   end
 
   def add_form(form, path, opts) do
-    opts = Spark.OptionsHelpers.validate!(opts, @add_form_opts)
+    opts = Spark.Options.validate!(opts, @add_form_opts)
 
     form =
       if is_binary(path) do
@@ -2994,7 +3005,7 @@ defmodule AshPhoenix.Form do
   Enum.reduce(removed_form_paths, form, &AshPhoenix.Form.remove_form(&2, &1))
   ```
 
-  #{Spark.OptionsHelpers.docs(@remove_form_opts)}
+  #{Spark.Options.docs(@remove_form_opts)}
   """
   def remove_form(form, path, opts \\ [])
 
@@ -3005,7 +3016,7 @@ defmodule AshPhoenix.Form do
   end
 
   def remove_form(form, path, opts) do
-    opts = Spark.OptionsHelpers.validate!(opts, @remove_form_opts)
+    opts = Spark.Options.validate!(opts, @remove_form_opts)
 
     if has_form?(form, path) do
       form =
@@ -3167,7 +3178,7 @@ defmodule AshPhoenix.Form do
           form.resource
           |> Ash.Resource.Info.public_attributes()
           |> Enum.filter(& &1.primary_key?)
-          |> Enum.reject(& &1.private?)
+          |> Enum.reject(&(!&1.public?))
           |> Enum.map(& &1.name)
 
         form.data

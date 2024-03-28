@@ -63,7 +63,7 @@ defmodule AshPhoenix.Form.Auto do
 
   ## Options
 
-  #{Spark.OptionsHelpers.docs(@auto_opts)}
+  #{Spark.Options.docs(@auto_opts)}
 
   ## Special Considerations
 
@@ -86,7 +86,7 @@ defmodule AshPhoenix.Form.Auto do
   @dialyzer {:nowarn_function, rel_to_resource: 2}
 
   def auto(resource, action, opts \\ []) do
-    opts = Spark.OptionsHelpers.validate!(opts, @auto_opts)
+    opts = Spark.Options.validate!(opts, @auto_opts)
 
     Keyword.new(
       related(resource, action, opts) ++
@@ -324,7 +324,7 @@ defmodule AshPhoenix.Form.Auto do
     end
 
     action.arguments
-    |> Enum.reject(& &1.private?)
+    |> Enum.reject(&(!&1.public?))
     |> exclude_non_map_types(auto_opts)
     |> Enum.flat_map(fn arg ->
       case find_manage_change(arg, action) do

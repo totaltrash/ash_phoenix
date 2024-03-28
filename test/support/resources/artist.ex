@@ -2,7 +2,7 @@ defmodule AshPhoenix.Test.Artist do
   @moduledoc false
 
   use Ash.Resource,
-    api: AshPhoenix.Test.Api,
+    domain: AshPhoenix.Test.Domain,
     data_layer: Ash.DataLayer.Ets
 
   ets do

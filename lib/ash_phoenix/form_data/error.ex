@@ -18,6 +18,12 @@ defimpl AshPhoenix.FormData.Error, for: Ash.Error.Query.InvalidQuery do
   end
 end
 
+# defimpl AshPhoenix.FormData.Error, for: Ash.Error.Invalid.NoSuchInput do
+#   def to_form_error(error) do
+#     {error.input, "", error.vars}
+#   end
+# end
+
 defimpl AshPhoenix.FormData.Error, for: Ash.Error.Query.InvalidArgument do
   def to_form_error(error) do
     {error.field, error.message, error.vars}

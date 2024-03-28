@@ -128,6 +128,7 @@ defmodule AshPhoenix.MixProject do
       {:phoenix, "~> 1.5.6 or ~> 1.6"},
       {:phoenix_html, "~> 4.0"},
       {:phoenix_live_view, "~> 0.20.3"},
+      {:nimble_options, "~> 1.1"},
       {:git_ops, "~> 2.5", only: [:dev, :test]},
       {:ex_doc, "~> 0.23", only: [:dev, :test], runtime: false},
       {:ex_check, "~> 0.14", only: [:dev, :test]},

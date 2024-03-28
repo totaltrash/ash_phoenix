@@ -8,6 +8,8 @@ defmodule AshPhoenix.Form.WrappedValue do
   end
 
   actions do
+    defaults []
+
     create :create do
       primary? true
     end

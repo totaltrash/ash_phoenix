@@ -1,14 +1,17 @@
 defmodule AshPhoenix.Test.Post do
   @moduledoc false
-  use Ash.Resource, data_layer: Ash.DataLayer.Ets
+
+  use Ash.Resource,
+    domain: AshPhoenix.Test.Domain,
+    data_layer: Ash.DataLayer.Ets
 
   ets do
     private?(true)
   end
 
   attributes do
-    uuid_primary_key(:id)
-    attribute(:text, :string, allow_nil?: false)
+    uuid_primary_key(:id, public?: true)
+    attribute(:text, :string, allow_nil?: false, public?: true)
     attribute(:union, AshPhoenix.Test.UnionValue)
     attribute(:union_array, {:array, AshPhoenix.Test.UnionValue})
     attribute(:list_of_ints, {:array, :integer})
@@ -16,6 +19,7 @@ defmodule AshPhoenix.Test.Post do
   end
 
   actions do
+    default_accept(:*)
     defaults([:read, :destroy])
 
     create :create do

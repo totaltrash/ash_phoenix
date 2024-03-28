@@ -37,7 +37,7 @@ defmodule AshPhoenix.FilterForm.Arguments do
           {Map.put(arg_values, argument.name, value), errors}
 
         true ->
-          case Ash.Type.cast_input(argument.type, value, argument.constraints) do
+          case Ash.Type.Helpers.cast_input(argument.type, value, argument.constraints) do
             {:ok, casted} ->
               {Map.put(arg_values, argument.name, casted), errors}
 
